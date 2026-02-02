@@ -1,0 +1,5 @@
+{
+  "name": "Licensing Map Explorer",
+  "description": "An interactive tool to visualize and compare software licensing tiers extracted from documentation PDFs using AI.",
+  "requestFramePermissions": []
+}

@@ -239,8 +239,14 @@ const App = () => {
             });
 
             if (!response.ok) {
-                const errData = await response.json();
-                throw new Error(errData.error || 'Backend processing failed');
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    const errData = await response.json();
+                    throw new Error(errData.error || 'Server error occurred');
+                } else {
+                    const text = await response.text();
+                    throw new Error(`Server returned error (${response.status}): ${text.substring(0, 100)}`);
+                }
             }
 
             const savedMap = await response.json();

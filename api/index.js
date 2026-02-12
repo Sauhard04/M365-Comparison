@@ -26,6 +26,10 @@ const upload = multer({ storage: storage });
 
 const apiKey = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
 
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', time: new Date().toISOString() });
+});
+
 // Endpoints
 app.get('/api/maps', async (req, res) => {
     try {

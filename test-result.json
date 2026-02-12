@@ -1,0 +1,177 @@
+{
+  "status": 200,
+  "data": {
+    "tiers": [
+      "Microsoft 365 E3",
+      "Microsoft 365 E5",
+      "Office 365 E1",
+      "Office 365 E3",
+      "Office 365 E5",
+      "Microsoft 365 F1",
+      "Microsoft 365 F3",
+      "Office 365 F3"
+    ],
+    "categories": [
+      {
+        "name": "Microsoft 365 Apps",
+        "features": [
+          {
+            "name": "Desktop client apps",
+            "description": "Includes Word, Excel, PowerPoint, OneNote, Outlook, Access (PC only), and Publisher (PC only).",
+            "link": "https://www.microsoft.com/en-us/microsoft-365/enterprise/microsoft-365-apps-for-enterprise",
+            "status": {
+              "Microsoft 365 E3": "Included",
+              "Microsoft 365 E5": "Included",
+              "Office 365 E1": "Excluded",
+              "Office 365 E3": "Included",
+              "Office 365 E5": "Included",
+              "Microsoft 365 F1": "Excluded",
+              "Microsoft 365 F3": "Excluded",
+              "Office 365 F3": "Excluded"
+            }
+          },
+          {
+            "name": "Install apps on up to 5 PCs/Macs",
+            "description": "Full desktop installation rights on multiple devices per user.",
+            "link": "https://www.microsoft.com/en-us/microsoft-365/enterprise/microsoft-365-apps-for-enterprise",
+            "status": {
+              "Microsoft 365 E3": "Included",
+              "Microsoft 365 E5": "Included",
+              "Office 365 E1": "Excluded",
+              "Office 365 E3": "Included",
+              "Office 365 E5": "Included",
+              "Microsoft 365 F1": "Excluded",
+              "Microsoft 365 F3": "Excluded",
+              "Office 365 F3": "Excluded"
+            }
+          }
+        ]
+      },
+      {
+        "name": "Security & Threat Protection",
+        "features": [
+          {
+            "name": "Microsoft Security Copilot",
+            "description": "Generative AI-powered security solution; E5 users receive 400 SCUs per month.",
+            "link": "https://learn.microsoft.com/en-us/copilot/security/security-copilot-inclusion",
+            "status": {
+              "Microsoft 365 E3": "Add-on",
+              "Microsoft 365 E5": "Included",
+              "Office 365 E1": "Add-on",
+              "Office 365 E3": "Add-on",
+              "Office 365 E5": "Add-on",
+              "Microsoft 365 F1": "Add-on",
+              "Microsoft 365 F3": "Add-on",
+              "Office 365 F3": "Add-on"
+            }
+          },
+          {
+            "name": "Microsoft Defender for Endpoint Plan 2",
+            "description": "Enterprise endpoint security platform for prevention, detection, and response.",
+            "link": "https://www.microsoft.com/en-us/microsoft-365/security/endpoint-defender",
+            "status": {
+              "Microsoft 365 E3": "Add-on",
+              "Microsoft 365 E5": "Included",
+              "Office 365 E1": "Add-on",
+              "Office 365 E3": "Add-on",
+              "Office 365 E5": "Add-on",
+              "Microsoft 365 F1": "Add-on",
+              "Microsoft 365 F3": "Add-on",
+              "Office 365 F3": "Add-on"
+            }
+          }
+        ]
+      },
+      {
+        "name": "Identity & Access Management",
+        "features": [
+          {
+            "name": "Microsoft Entra ID Plan 1",
+            "description": "Provides core identity and access management capabilities.",
+            "link": "https://www.microsoft.com/en-us/security/business/identity-access/microsoft-entra-id",
+            "status": {
+              "Microsoft 365 E3": "Included",
+              "Microsoft 365 E5": "Included",
+              "Office 365 E1": "Add-on",
+              "Office 365 E3": "Included",
+              "Office 365 E5": "Included",
+              "Microsoft 365 F1": "Included",
+              "Microsoft 365 F3": "Included",
+              "Office 365 F3": "Add-on"
+            }
+          },
+          {
+            "name": "Microsoft Entra ID Plan 2",
+            "description": "Advanced identity protection, privileged identity management, and risk-based access.",
+            "link": "https://www.microsoft.com/en-us/security/business/identity-access/microsoft-entra-id",
+            "status": {
+              "Microsoft 365 E3": "Add-on",
+              "Microsoft 365 E5": "Included",
+              "Office 365 E1": "Add-on",
+              "Office 365 E3": "Add-on",
+              "Office 365 E5": "Add-on",
+              "Microsoft 365 F1": "Add-on",
+              "Microsoft 365 F3": "Add-on",
+              "Office 365 F3": "Add-on"
+            }
+          }
+        ]
+      },
+      {
+        "name": "Automation & App Building",
+        "features": [
+          {
+            "name": "Power Automate for Microsoft 365",
+            "description": "Create automated workflows (Cloud flows only for most plans).",
+            "link": "https://docs.microsoft.com/power-platform/admin/powerapps-flow-licensing-faq",
+            "status": {
+              "Microsoft 365 E3": "Included",
+              "Microsoft 365 E5": "Included",
+              "Office 365 E1": "Included",
+              "Office 365 E3": "Included",
+              "Office 365 E5": "Included",
+              "Microsoft 365 F1": "Excluded",
+              "Microsoft 365 F3": "Included",
+              "Office 365 F3": "Included"
+            }
+          },
+          {
+            "name": "Power Apps for Microsoft 365",
+            "description": "Build custom business apps that connect to your data.",
+            "link": "https://docs.microsoft.com/power-platform/admin/powerapps-flow-licensing-faq",
+            "status": {
+              "Microsoft 365 E3": "Included",
+              "Microsoft 365 E5": "Included",
+              "Office 365 E1": "Excluded",
+              "Office 365 E3": "Included",
+              "Office 365 E5": "Included",
+              "Microsoft 365 F1": "Excluded",
+              "Microsoft 365 F3": "Included",
+              "Office 365 F3": "Included"
+            }
+          }
+        ]
+      },
+      {
+        "name": "Analytics",
+        "features": [
+          {
+            "name": "Power BI Pro",
+            "description": "Self-service analytics and data visualization capabilities.",
+            "link": "https://powerbi.microsoft.com/en-us/pricing/",
+            "status": {
+              "Microsoft 365 E3": "Add-on",
+              "Microsoft 365 E5": "Included",
+              "Office 365 E1": "Add-on",
+              "Office 365 E3": "Add-on",
+              "Office 365 E5": "Included",
+              "Microsoft 365 F1": "Add-on",
+              "Microsoft 365 F3": "Add-on",
+              "Office 365 F3": "Add-on"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

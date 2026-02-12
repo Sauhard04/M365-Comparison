@@ -11,14 +11,27 @@ app.use(express.json());
 
 // MongoDB Setup
 const uri = process.env.MONGODB_URI;
-const client = new MongoClient(uri);
+const client = new MongoClient(uri, {
+    // Force TLS and increase timeout for serverless stability
+    tls: true,
+    connectTimeoutMS: 10000,
+    serverSelectionTimeoutMS: 10000,
+});
+
 let db;
 
 async function getDB() {
-    if (db) return db;
-    await client.connect();
-    db = client.db('licensing_db');
-    return db;
+    try {
+        if (db) return db;
+        await client.connect();
+        db = client.db('licensing_db');
+        return db;
+    } catch (err) {
+        console.error("DB Connection Failed:", err);
+        // Reset client if connection failed to allow retry
+        await client.close();
+        throw err;
+    }
 }
 
 const storage = multer.memoryStorage();
@@ -137,26 +150,36 @@ app.post('/api/extract', upload.single('file'), async (req, res) => {
         const textResponse = result.response.text();
         let jsonString = textResponse.replace(/```json|```/g, '').trim();
 
+        // 1. Parse JSON safely
+        let parsed;
         try {
-            const parsed = JSON.parse(jsonString);
+            parsed = JSON.parse(jsonString);
+        } catch (parseError) {
+            console.error("AI JSON Parse Error:", parseError.message);
+            return res.status(500).json({ error: `AI returned invalid JSON: ${parseError.message}` });
+        }
 
-            const newMap = {
-                title: file.originalname.replace(/\.pdf$/i, ''),
-                type: track,
-                data: parsed,
-                timestamp: Date.now(),
-                fileName: file.originalname
-            };
+        // 2. Prepare Map data
+        const newMap = {
+            title: file.originalname.replace(/\.pdf$/i, ''),
+            type: track,
+            data: parsed,
+            timestamp: Date.now(),
+            fileName: file.originalname
+        };
 
+        // 3. Save to Database (Moved outside of JSON catch)
+        try {
             const database = await getDB();
             const savedResult = await database.collection('maps').insertOne(newMap);
-
             res.json({ ...newMap, _id: savedResult.insertedId });
-        } catch (parseError) {
-            throw new Error(`Invalid JSON format from AI: ${parseError.message}`);
+        } catch (dbError) {
+            console.error("Database Save Error:", dbError);
+            res.status(500).json({ error: `Failed to save to database: ${dbError.message}` });
         }
 
     } catch (error) {
+        console.error("Extraction Error:", error);
         res.status(500).json({
             error: error.message,
         });

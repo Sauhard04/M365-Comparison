@@ -108,9 +108,9 @@ const FeatureNode = ({ feature, tier, isAdmin, isSelected, onSelect }) => {
 
     return (
         <div className={`
-      feature-node p-3 mb-2 rounded-lg border transition-all duration-200 group
+      feature-node group cursor-pointer
       ${isSelected ? 'border-blue-500 ring-2 ring-blue-500/20' : ''}
-      ${isIncluded ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-50/50 border-slate-100 opacity-60'}
+      ${isIncluded ? 'bg-white' : 'bg-slate-50 opacity-60'}
     `}>
             <div className="flex items-center justify-between gap-2 mb-1">
                 <div className="flex items-center gap-1.5 min-w-0">
@@ -172,15 +172,27 @@ const App = () => {
     const mapRef = useRef(null);
     const dragStart = useRef({ x: 0, y: 0 });
 
-    // Persistence
+    // Persistence: Fetch from MongoDB on mount
     useEffect(() => {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) setMaps(JSON.parse(saved));
+        const fetchMaps = async () => {
+            try {
+                const response = await fetch('/api/maps');
+                if (response.ok) {
+                    const data = await response.json();
+                    // Maps from DB use _id, we'll map them to id for compatibility
+                    setMaps(data.map(m => ({ ...m, id: m._id })));
+                }
+            } catch (err) {
+                console.warn("DB Fetch failed, falling back to localStorage", err);
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) setMaps(JSON.parse(saved));
+            }
+        };
+        fetchMaps();
 
         const savedAdmins = localStorage.getItem(ADMIN_STORAGE_KEY);
         let adminList = savedAdmins ? JSON.parse(savedAdmins) : [];
 
-        // Seed default admin if missing
         if (!adminList.some(a => a.username === 'meridian')) {
             adminList.push({
                 username: 'meridian',
@@ -200,6 +212,7 @@ const App = () => {
         }
     }, []);
 
+    // Also sync to localStorage as secondary cache
     useEffect(() => {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(maps));
     }, [maps]);
@@ -220,7 +233,7 @@ const App = () => {
             formData.append('file', file);
             formData.append('track', uploadTrack);
 
-            const response = await fetch('http://localhost:5000/api/extract', {
+            const response = await fetch('/api/extract', {
                 method: 'POST',
                 body: formData
             });
@@ -230,24 +243,31 @@ const App = () => {
                 throw new Error(errData.error || 'Backend processing failed');
             }
 
-            const parsed = await response.json();
-            if (parsed.tiers && parsed.categories) {
-                const newMap = {
-                    id: generateId(),
-                    title: file.name.replace(/\.pdf$/i, ''),
-                    type: uploadTrack,
-                    data: parsed,
-                    timestamp: Date.now()
-                };
-                setMaps(prev => [newMap, ...prev]);
-                setView('library');
-            }
+            const savedMap = await response.json();
+            // Assign DB id to local id
+            const newMap = { ...savedMap, id: savedMap._id };
+            setMaps(prev => [newMap, ...prev]);
+            setView('library');
         } catch (err) {
             console.error("AI EXTRACTION ERROR:", err);
-            const errorMsg = err.message || "Unknown error";
-            alert(`AI Processing Failed: ${errorMsg}\n\n1. Ensure the Node backend is running (npm run server)\n2. Check your .env has VITE_GEMINI_API_KEY`);
+            alert(`AI Processing Failed: ${err.message}`);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const deleteMap = async (mapId) => {
+        if (!window.confirm("Are you sure you want to delete this knowledge source from the cloud?")) return;
+
+        try {
+            const response = await fetch(`/api/maps/${mapId}`, { method: 'DELETE' });
+            if (response.ok) {
+                setMaps(prev => prev.filter(m => m.id !== mapId));
+            } else {
+                throw new Error("Failed to delete from server");
+            }
+        } catch (err) {
+            alert("Error deleting map: " + err.message);
         }
     };
 
@@ -389,15 +409,15 @@ const App = () => {
                 </div>
 
                 {view !== 'landing' && (
-                    <div className="flex items-center gap-3 flex-1 max-w-4xl mx-8">
+                    <div className="hidden md:flex items-center gap-3 flex-1 max-w-4xl mx-8">
                         <div className="relative flex-1">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                            <input type="text" placeholder="Search capabilities..." className="w-full pl-12 pr-4 py-2.5 bg-slate-100 border-none rounded-2xl text-sm focus:ring-4 focus:ring-blue-500/10 transition-all" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                            <input type="text" placeholder="Search capabilities..." className="w-full pl-12 pr-4 py-2.5 bg-slate-100 border-none rounded-2xl text-sm focus:ring-4 focus:ring-blue-500/10 transition-all font-medium" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                         </div>
 
                         <div className="flex bg-slate-100 p-1 rounded-2xl">
-                            <button onClick={() => setView('map')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${view === 'map' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}><MapIcon className="w-4 h-4" /> Map</button>
-                            <button onClick={() => setView('matrix')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${view === 'matrix' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}><TableIcon className="w-4 h-4" /> Matrix</button>
+                            <button onClick={() => setView('map')} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${view === 'map' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}><MapIcon className="w-4 h-4" /> Map</button>
+                            <button onClick={() => setView('matrix')} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${view === 'matrix' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}><TableIcon className="w-4 h-4" /> Matrix</button>
                         </div>
                     </div>
                 )}
@@ -423,29 +443,29 @@ const App = () => {
             <main className="flex-1 relative overflow-hidden">
                 {/* Landing View */}
                 {view === 'landing' && (
-                    <div className="h-full overflow-auto bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:32px_32px]">
-                        <div className="max-w-7xl mx-auto px-12 py-20">
-                            <div className="text-center mb-24">
-                                <span className="bg-blue-50 text-blue-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest mb-6 inline-block">V5 Semantic Merging Engine</span>
-                                <h2 className="text-6xl font-black text-slate-900 tracking-tighter mb-6 leading-tight">Master your Licensing <br />Ground Truth.</h2>
-                                <p className="text-slate-500 text-xl max-w-2xl mx-auto leading-relaxed">
+                    <div className="h-full overflow-auto bg-[radial-gradient(#e2e8f0_1.5px,transparent_1.5px)] [background-size:32px_32px]">
+                        <div className="container-responsive py-12 lg:py-20 animate-fade-in">
+                            <div className="text-center mb-16 lg:mb-24">
+                                <span className="bg-blue-50 text-blue-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] mb-6 inline-block">Architecture Comparison Engine</span>
+                                <h2 className="text-4xl lg:text-7xl font-black text-slate-900 tracking-tighter mb-6 leading-none">Master your Licensing <br className="hidden md:block" />Ground Truth.</h2>
+                                <p className="text-slate-500 text-lg lg:text-xl max-w-2xl mx-auto leading-relaxed px-4">
                                     Automatically synchronize, verify, and visualize Microsoft 365 licensing tracks with deep verification and semantic terminology merging.
                                 </p>
                             </div>
 
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16">
                                 <section>
                                     <div className="flex items-center gap-4 mb-8">
-                                        <div className="p-4 bg-blue-600 text-white rounded-2xl shadow-xl shadow-blue-100"><ShieldCheck className="w-8 h-8" /></div>
-                                        <h3 className="text-3xl font-black text-slate-900">Enterprise</h3>
+                                        <div className="p-3.5 bg-blue-600 text-white rounded-2xl shadow-xl shadow-blue-100"><ShieldCheck className="w-6 h-6 lg:w-8 lg:h-8" /></div>
+                                        <h3 className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight text-outfit">Enterprise Tracks</h3>
                                     </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="grid-responsive-cards">
                                         {maps.filter(m => m.type === 'Enterprise').map(m => (
-                                            <div key={m.id} className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-xl transition-all">
-                                                <h4 className="font-bold text-slate-800 mb-6 truncate">{m.title}</h4>
-                                                <div className="space-y-2">
+                                            <div key={m.id} className="card-premium p-6 lg:p-8 flex flex-col">
+                                                <h4 className="font-bold text-slate-800 mb-6 truncate text-lg pr-8">{m.title}</h4>
+                                                <div className="space-y-3 mt-auto">
                                                     {m.data.tiers.map(t => (
-                                                        <button key={t} onClick={() => toggleSelection(m.id, t)} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all font-bold text-xs ${comparisonTiers.some(p => p.mapId === m.id && p.tier === t) ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-slate-50 border-slate-100 text-slate-600 hover:border-slate-300'}`}>
+                                                        <button key={t} onClick={() => toggleSelection(m.id, t)} className={`w-full flex items-center justify-between px-5 py-3.5 rounded-2xl border-2 transition-all font-black text-[10px] uppercase tracking-widest ${comparisonTiers.some(p => p.mapId === m.id && p.tier === t) ? 'bg-blue-600 border-blue-600 text-white shadow-xl translate-y-[-2px]' : 'bg-slate-50/50 border-slate-100 text-slate-500 hover:border-slate-300 hover:bg-white'}`}>
                                                             {t}
                                                             {comparisonTiers.some(p => p.mapId === m.id && p.tier === t) ? <CheckCircle2 className="w-4 h-4" /> : <Plus className="w-4 h-4 opacity-20" />}
                                                         </button>
@@ -458,16 +478,16 @@ const App = () => {
 
                                 <section>
                                     <div className="flex items-center gap-4 mb-8">
-                                        <div className="p-4 bg-emerald-600 text-white rounded-2xl shadow-xl shadow-emerald-100"><Users className="w-8 h-8" /></div>
-                                        <h3 className="text-3xl font-black text-slate-900">Business</h3>
+                                        <div className="p-3.5 bg-emerald-600 text-white rounded-2xl shadow-xl shadow-emerald-100"><Users className="w-6 h-6 lg:w-8 lg:h-8" /></div>
+                                        <h3 className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight text-outfit">Business Tracks</h3>
                                     </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="grid-responsive-cards">
                                         {maps.filter(m => m.type === 'Business').map(m => (
-                                            <div key={m.id} className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-xl transition-all">
-                                                <h4 className="font-bold text-slate-800 mb-6 truncate">{m.title}</h4>
-                                                <div className="space-y-2">
+                                            <div key={m.id} className="card-premium p-6 lg:p-8 flex flex-col hover:border-emerald-400">
+                                                <h4 className="font-bold text-slate-800 mb-6 truncate text-lg pr-8">{m.title}</h4>
+                                                <div className="space-y-3 mt-auto">
                                                     {m.data.tiers.map(t => (
-                                                        <button key={t} onClick={() => toggleSelection(m.id, t)} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all font-bold text-xs ${comparisonTiers.some(p => p.mapId === m.id && p.tier === t) ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg' : 'bg-slate-50 border-slate-100 text-slate-600 hover:border-slate-300'}`}>
+                                                        <button key={t} onClick={() => toggleSelection(m.id, t)} className={`w-full flex items-center justify-between px-5 py-3.5 rounded-2xl border-2 transition-all font-black text-[10px] uppercase tracking-widest ${comparisonTiers.some(p => p.mapId === m.id && p.tier === t) ? 'bg-emerald-600 border-emerald-600 text-white shadow-xl translate-y-[-2px]' : 'bg-slate-50/50 border-slate-100 text-slate-500 hover:border-slate-300 hover:bg-white'}`}>
                                                             {t}
                                                             {comparisonTiers.some(p => p.mapId === m.id && p.tier === t) ? <CheckCircle2 className="w-4 h-4" /> : <Plus className="w-4 h-4 opacity-20" />}
                                                         </button>
@@ -482,17 +502,18 @@ const App = () => {
 
                         {/* Float Comparison Action */}
                         {comparisonTiers.length > 0 && (
-                            <div className="fixed bottom-12 left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur-2xl px-8 py-6 rounded-[3rem] border border-white/20 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] flex items-center gap-12 z-50 animate-in slide-in-from-bottom-12 duration-500">
-                                <div className="flex flex-col">
-                                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 mb-1">Architecture Comparison</span>
-                                    <div className="flex gap-2">
-                                        {comparisonTiers.map(c => <span key={c.mapId + c.tier} className="text-white font-bold text-sm bg-white/10 px-3 py-1 rounded-lg">{c.tier}</span>)}
+                            <div className="fixed bottom-6 lg:bottom-12 left-1/2 -translate-x-1/2 glass-panel px-6 lg:px-8 py-4 lg:py-6 rounded-[2rem] lg:rounded-[3rem] border border-white shadow-2xl flex flex-col md:flex-row items-center gap-6 lg:gap-12 z-50 animate-in slide-in-from-bottom-12 duration-500 w-[90%] md:w-auto">
+                                <div className="flex flex-col items-center md:items-start text-center md:text-left">
+                                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">Architecture Comparison Summary</span>
+                                    <div className="flex flex-wrap justify-center md:justify-start gap-2 max-w-md">
+                                        {comparisonTiers.slice(0, 3).map(c => <span key={c.mapId + c.tier} className="text-slate-700 font-bold text-[10px] bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">{c.tier}</span>)}
+                                        {comparisonTiers.length > 3 && <span className="text-slate-400 font-bold text-[10px] py-1">+{comparisonTiers.length - 3} more tracks</span>}
                                     </div>
                                 </div>
-                                <div className="flex gap-4">
-                                    <button onClick={() => setComparisonTiers([])} className="text-white/60 font-bold hover:text-white">Reset</button>
-                                    <button onClick={() => setView('matrix')} className="bg-blue-500 text-white px-8 py-4 rounded-2xl font-black text-lg hover:bg-blue-400 transition-all shadow-xl shadow-blue-500/20 active:scale-95 flex items-center gap-3">
-                                        View Comparison <ChevronRight className="w-6 h-6" />
+                                <div className="flex gap-4 w-full md:w-auto">
+                                    <button onClick={() => setComparisonTiers([])} className="flex-1 md:flex-none text-slate-400 font-black uppercase tracking-widest text-[9px] hover:text-rose-500 px-4 transition-all">Clear All</button>
+                                    <button onClick={() => setView('matrix')} className="flex-1 md:flex-none bg-blue-600 text-white px-8 lg:px-10 py-3 lg:py-4 rounded-xl lg:rounded-2xl font-black text-xs lg:text-sm hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20 active:scale-95 flex items-center justify-center gap-3">
+                                        Generate Matrix <ChevronRight className="w-5 h-5" />
                                     </button>
                                 </div>
                             </div>
@@ -503,7 +524,7 @@ const App = () => {
                 {/* Map View */}
                 {view === 'map' && activeMap && (
                     <div
-                        className={`absolute inset-0 bg-[#f8fafc] overflow-hidden ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                        className={`absolute inset-0 bg-slate-50 overflow-hidden map-canvas ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
                         onWheel={handleWheel}
                         onMouseDown={onMouseDown}
                         onMouseMove={onMouseMove}
@@ -576,87 +597,90 @@ const App = () => {
 
                 {/* Matrix View */}
                 {view === 'matrix' && activeMap && (
-                    <div className="absolute inset-0 bg-white overflow-auto p-12 custom-scrollbar">
-                        <div className="max-w-screen-2xl mx-auto">
-                            <div className="flex items-center justify-between mb-12">
-                                <div>
-                                    <h2 className="text-4xl font-black text-slate-900 tracking-tight">
-                                        {matrixMode === 'full' ? 'Semantic Merged Matrix' : 'Availability Difference Matrix'}
+                    <div className="absolute inset-0 bg-white overflow-auto flex flex-col animate-fade-in">
+                        <div className="container-responsive py-12">
+                            <div className="flex flex-col lg:flex-row items-center justify-between gap-8 mb-16">
+                                <div className="text-center lg:text-left">
+                                    <h2 className="text-3xl lg:text-5xl font-black text-slate-900 tracking-tight leading-none">
+                                        {matrixMode === 'full' ? 'Semantic Merged Matrix' : 'Availability Matrix'}
                                     </h2>
-                                    <p className="text-slate-500 mt-2 font-medium">Auto-collapsing identical capabilities across {comparisonTiers.length} tracks using deep grounded extraction.</p>
+                                    <p className="text-slate-500 mt-4 font-medium text-sm lg:text-base">Auto-collapsing identical capabilities across {comparisonTiers.length} tracks using deep grounded extraction.</p>
                                 </div>
-                                <div className="flex items-center gap-4">
-                                    <div className="flex bg-slate-100 p-1.5 rounded-2xl mr-4 shadow-inner">
+                                <div className="flex flex-wrap justify-center items-center gap-4">
+                                    <div className="flex bg-slate-100 p-1.5 rounded-2xl shadow-inner border border-slate-200">
                                         <button
                                             onClick={() => setMatrixMode('full')}
-                                            className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${matrixMode === 'full' ? 'bg-white shadow-md text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                                            className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.1em] transition-all ${matrixMode === 'full' ? 'bg-white shadow-md text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
                                         >
                                             Detailed
                                         </button>
                                         <button
                                             onClick={() => setMatrixMode('availability')}
-                                            className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${matrixMode === 'availability' ? 'bg-white shadow-md text-emerald-600' : 'text-slate-400 hover:text-slate-600'}`}
+                                            className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.1em] transition-all ${matrixMode === 'availability' ? 'bg-white shadow-md text-emerald-600' : 'text-slate-400 hover:text-slate-600'}`}
                                         >
-                                            Availability
+                                            Presence
                                         </button>
                                     </div>
                                     <button
                                         onClick={() => setDiffOnly(!diffOnly)}
-                                        className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-bold transition-all border-2 ${diffOnly ? 'bg-amber-500 border-amber-500 text-white shadow-lg' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}
+                                        className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all border-2 ${diffOnly ? 'bg-amber-500 border-amber-500 text-white shadow-lg' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}`}
                                     >
-                                        <ArrowLeftRight className="w-4 h-4" /> {diffOnly ? 'Showing Differences' : 'Show All Comparisons'}
+                                        <ArrowLeftRight className="w-4 h-4" /> {diffOnly ? 'Differences' : 'All Feature'}
                                     </button>
-                                    <button onClick={() => setView('landing')} className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-6 py-3 rounded-2xl font-bold transition-all">Modify Set</button>
+                                    <button onClick={() => setView('landing')} className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/10">Modify Set</button>
                                 </div>
                             </div>
-                            <table className="w-full border-separate border-spacing-0">
-                                <thead className="sticky top-0 z-30 bg-white">
-                                    <tr>
-                                        <th className="p-8 text-left border-b-2 font-black text-2xl min-w-[350px]">Capability Area</th>
-                                        {activeMap.tiers.map(t => <th key={t} className="p-8 text-center border-b-2 font-black text-[10px] uppercase tracking-[0.2em] text-slate-400">{t}</th>)}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredCategories.map(cat => (
-                                        <React.Fragment key={cat.name}>
-                                            <tr className="bg-slate-900 text-white">
-                                                <td colSpan={activeMap.tiers.length + 1} className="p-3 px-8 text-[10px] font-black uppercase tracking-[0.3em]">{cat.name}</td>
-                                            </tr>
-                                            {cat.features.map(f => (
-                                                <tr key={f.name} className="hover:bg-slate-50 transition-colors group">
-                                                    <td className="p-8 border-b border-slate-100">
-                                                        <div className="flex items-center gap-3">
-                                                            <span className="font-bold text-lg">{f.name}</span>
-                                                            {f.link && <a href={f.link} target="_blank" className="text-blue-500 hover:text-blue-700"><ExternalLink className="w-4 h-4" /></a>}
-                                                        </div>
-                                                        <p className="text-xs text-slate-500 mt-1.5 leading-relaxed max-w-lg">{f.description}</p>
-                                                    </td>
-                                                    {activeMap.tiers.map(t => {
-                                                        const status = f.status[t];
-                                                        const sLower = safeLower(status);
-                                                        const isIncluded = sLower.includes('included') || sLower.includes('yes') || sLower === 'full';
 
-                                                        return (
-                                                            <td key={t} className={`p-8 text-center border-b border-slate-100 ${matrixMode === 'availability' && isIncluded ? 'bg-emerald-50/30' : ''}`}>
-                                                                <div className="flex flex-col items-center gap-2">
-                                                                    {matrixMode === 'full' ? (
-                                                                        <>
-                                                                            <StatusIcon status={status} />
-                                                                            <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">{status}</span>
-                                                                        </>
-                                                                    ) : (
-                                                                        isIncluded ? <Check className="w-6 h-6 text-emerald-500 stroke-[3px]" /> : null
-                                                                    )}
-                                                                </div>
-                                                            </td>
-                                                        );
-                                                    })}
+                            <div className="overflow-x-auto rounded-[2.5rem] border border-slate-200 shadow-2xl bg-white">
+                                <table className="w-full border-separate border-spacing-0">
+                                    <thead className="sticky top-0 z-30 bg-white/90 backdrop-blur-xl">
+                                        <tr>
+                                            <th className="p-8 text-left border-b-2 font-black text-xl lg:text-2xl min-w-[300px]">Capability Area</th>
+                                            {activeMap.tiers.map(t => <th key={t} className="p-8 text-center border-b-2 font-black text-[9px] uppercase tracking-[0.2em] text-slate-400 max-w-[150px]">{t}</th>)}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredCategories.map(cat => (
+                                            <React.Fragment key={cat.name}>
+                                                <tr className="bg-slate-900 text-white">
+                                                    <td colSpan={activeMap.tiers.length + 1} className="p-4 px-8 text-[9px] font-black uppercase tracking-[0.3em] opacity-80">{cat.name}</td>
                                                 </tr>
-                                            ))}
-                                        </React.Fragment>
-                                    ))}
-                                </tbody>
-                            </table>
+                                                {cat.features.map(f => (
+                                                    <tr key={f.name} className="hover:bg-slate-50/50 transition-colors group">
+                                                        <td className="p-8 border-b border-slate-100">
+                                                            <div className="flex items-center gap-3">
+                                                                <span className="font-bold text-base lg:text-lg text-slate-800">{f.name}</span>
+                                                                {f.link && <a href={f.link} target="_blank" className="text-blue-500 hover:text-blue-700 transition-colors"><ExternalLink className="w-4 h-4" /></a>}
+                                                            </div>
+                                                            <p className="text-xs text-slate-500 mt-2 leading-relaxed max-w-lg font-medium">{f.description}</p>
+                                                        </td>
+                                                        {activeMap.tiers.map(t => {
+                                                            const status = f.status[t];
+                                                            const sLower = safeLower(status);
+                                                            const isIncluded = sLower.includes('included') || sLower.includes('yes') || sLower === 'full';
+
+                                                            return (
+                                                                <td key={t} className={`p-8 text-center border-b border-slate-100 ${matrixMode === 'availability' && isIncluded ? 'bg-emerald-50/20' : ''}`}>
+                                                                    <div className="flex flex-col items-center gap-2">
+                                                                        {matrixMode === 'full' ? (
+                                                                            <>
+                                                                                <StatusIcon status={status} />
+                                                                                <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 mt-1">{status}</span>
+                                                                            </>
+                                                                        ) : (
+                                                                            isIncluded ? <Check className="w-6 h-6 text-emerald-500 stroke-[3px]" /> : null
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                            );
+                                                        })}
+                                                    </tr>
+                                                ))}
+                                            </React.Fragment>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -678,7 +702,7 @@ const App = () => {
                                             <div key={m.id} className="bg-white rounded-[2.5rem] border border-slate-200 p-8 flex flex-col shadow-sm hover:shadow-xl transition-all">
                                                 <div className="flex justify-between items-start mb-6">
                                                     <div className={`p-4 rounded-2xl ${m.type === 'Enterprise' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'}`}><FileText className="w-7 h-7" /></div>
-                                                    <button onClick={() => setMaps(prev => prev.filter(x => x.id !== m.id))} className="text-slate-300 hover:text-rose-500 p-2 transition-colors"><Trash2 className="w-5 h-5" /></button>
+                                                    <button onClick={() => deleteMap(m.id)} className="text-slate-300 hover:text-rose-500 p-2 transition-colors"><Trash2 className="w-5 h-5" /></button>
                                                 </div>
                                                 <h3 className="text-xl font-bold mb-2">{m.title}</h3>
                                                 <p className="text-[10px] text-slate-400 font-black uppercase mb-6 tracking-widest">{m.type} Track</p>
@@ -793,7 +817,7 @@ const App = () => {
             <footer className="bg-white border-t border-slate-200 px-6 py-3 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-6">
                     <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                        <Database className="w-3.5 h-3.5" /> Persistent Local Workspace
+                        <Database className="w-3.5 h-3.5" /> Cloud Context Storage (MongoDB Atlas)
                     </div>
                     <div className="w-[1px] h-4 bg-slate-200"></div>
                     <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">

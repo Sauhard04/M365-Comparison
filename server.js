@@ -7,6 +7,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { MongoClient, ObjectId } from 'mongodb';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,13 +20,38 @@ const port = 5000;
 app.use(cors());
 app.use(express.json());
 
+
+// MongoDB Setup
+const uri = process.env.MONGODB_URI;
+if (!uri) {
+  console.error("❌ MONGODB_URI is missing in .env!");
+}
+const client = new MongoClient(uri);
+let mapsCollection;
+
+async function connectDB() {
+  try {
+    await client.connect();
+    const db = client.db('licensing_db');
+    mapsCollection = db.collection('maps');
+    console.log("🍃 Connected to MongoDB Atlas");
+  } catch (err) {
+    console.error("❌ MongoDB Connection Error:", err);
+    // Retry logic could go here, but for now we'll just log
+  }
+}
+connectDB();
+
+// Middlewares
+app.use(cors());
+app.use(express.json());
+
 // Ensure uploads directory exists
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir);
 }
 
-// Fixed Storage: Save in /uploads with original filename
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, 'uploads/');
@@ -37,12 +63,28 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-// Use the API KEY from env
 const apiKey = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
 
-if (!apiKey) {
-  console.error("❌ ERROR: VITE_GEMINI_API_KEY is missing in .env file!");
-}
+// Endpoints
+app.get('/api/maps', async (req, res) => {
+  try {
+    if (!mapsCollection) throw new Error("Database not connected");
+    const maps = await mapsCollection.find({}).sort({ timestamp: -1 }).toArray();
+    res.json(maps);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/maps/:id', async (req, res) => {
+  try {
+    if (!mapsCollection) throw new Error("Database not connected");
+    await mapsCollection.deleteOne({ _id: new ObjectId(req.params.id) });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 app.post('/api/extract', upload.single('file'), async (req, res) => {
   const { track } = req.body;
@@ -56,15 +98,16 @@ app.post('/api/extract', upload.single('file'), async (req, res) => {
     return res.status(500).json({ error: 'Server configuration error: Gemini API Key is missing.' });
   }
 
+  if (!mapsCollection) {
+    return res.status(503).json({ error: 'Database is still connecting. Please try again in a few seconds.' });
+  }
+
   try {
-    console.log(`📄 [v1.0.5] Processing file: ${file.originalname} (${track})`);
+    console.log(`📄 [v1.0.7] Processing file: ${file.originalname} (${track})`);
 
     const genAI = new GoogleGenerativeAI(apiKey);
-
-    // Multi-model Fallback Strategy
     const modelsToTry = ["gemini-2.0-flash", "gemini-flash-latest", "gemini-pro-latest"];
     let result = null;
-    let lastError = null;
 
     const fileContent = fs.readFileSync(file.path);
     const base64Data = fileContent.toString('base64');
@@ -123,7 +166,7 @@ app.post('/api/extract', upload.single('file'), async (req, res) => {
             retries--;
             delay *= 2;
           } else {
-            break; // Try next model
+            break;
           }
         }
       }
@@ -138,27 +181,53 @@ app.post('/api/extract', upload.single('file'), async (req, res) => {
     }
 
     const textResponse = result.response.text();
-    console.log("✅ Received response from Gemini");
-
     let jsonString = textResponse.replace(/```json|```/g, '').trim();
 
+    let parsed;
     try {
-      const parsed = JSON.parse(jsonString);
-      res.json(parsed);
+      parsed = JSON.parse(jsonString);
     } catch (parseError) {
       console.error("❌ JSON Parse Error. Raw string preview:", jsonString.substring(0, 100));
       throw new Error(`Invalid JSON format from AI: ${parseError.message}`);
     }
 
+    // Save to MongoDB
+    const newMap = {
+      title: file.originalname.replace(/\.pdf$/i, ''),
+      type: track,
+      data: parsed,
+      timestamp: Date.now(),
+      fileName: file.originalname
+    };
+
+    const savedResult = await mapsCollection.insertOne(newMap);
+    res.json({ ...newMap, _id: savedResult.insertedId });
+
   } catch (error) {
     console.error('❌ Extraction Error Detail:', error);
-    res.status(500).json({
-      error: error.message,
-      details: error.stack
-    });
+    res.status(500).json({ error: error.message });
+  } finally {
+    // Safe Cleanup
+    if (file && file.path && fs.existsSync(file.path)) {
+      try {
+        fs.unlinkSync(file.path);
+        console.log(`🗑️ Successfully cleaned up: ${file.path}`);
+      } catch (cleanupErr) {
+        console.warn(`⚠️ Cleanup warning: Could not delete ${file.path}`);
+      }
+    }
   }
 });
 
+// Global Error Handler (Always return JSON)
+app.use((err, req, res, next) => {
+  console.error("💥 Unhandled Error:", err);
+  res.status(500).json({
+    error: "Internal Server Error",
+    message: err.message
+  });
+});
+
 app.listen(port, () => {
-  console.log(`🚀 [v1.0.5] Server started on http://localhost:${port}`);
+  console.log(`🚀 [v1.0.7] Server started on http://localhost:${port}`);
 });

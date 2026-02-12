@@ -101,6 +101,19 @@ const StatusIcon = ({ status }) => {
     return <XCircle className="w-4 h-4 text-rose-400" />;
 };
 
+const getLicenseDocLink = (name) => {
+    const lower = name.toLowerCase();
+    if (lower.includes('e5')) return 'https://www.microsoft.com/en-us/microsoft-365/enterprise/microsoft365-e5';
+    if (lower.includes('e3')) return 'https://www.microsoft.com/en-us/microsoft-365/enterprise/microsoft365-e3';
+    if (lower.includes('f3')) return 'https://www.microsoft.com/en-us/microsoft-365/enterprise/microsoft-365-f3';
+    if (lower.includes('business premium')) return 'https://www.microsoft.com/en-us/microsoft-365/business/microsoft-365-business-premium';
+    if (lower.includes('business standard')) return 'https://www.microsoft.com/en-us/microsoft-365/business/microsoft-365-business-standard';
+    if (lower.includes('business basic')) return 'https://www.microsoft.com/en-us/microsoft-365/business/microsoft-365-business-basic';
+    if (lower.includes('defender')) return 'https://www.microsoft.com/en-us/security/business-solutions/microsoft-defender-for-endpoint';
+    if (lower.includes('purview')) return 'https://www.microsoft.com/en-us/security/business-solutions/microsoft-purview';
+    return null;
+};
+
 const FeatureNode = ({ feature, tier, isAdmin, isSelected, onSelect }) => {
     const status = feature.status?.[tier] || 'Excluded';
     const sLower = safeLower(status);
@@ -468,13 +481,27 @@ const App = () => {
                                     <div className="grid-responsive-cards">
                                         {maps.filter(m => m.type === 'Enterprise').map(m => (
                                             <div key={m.id} className="card-premium p-6 lg:p-8 flex flex-col">
-                                                <h4 className="font-bold text-slate-800 mb-6 truncate text-lg pr-8">{m.title}</h4>
+                                                <div className="flex justify-between items-start mb-6">
+                                                    <h4 className="font-bold text-slate-800 truncate text-lg pr-2">{m.title}</h4>
+                                                    {getLicenseDocLink(m.title) && (
+                                                        <a href={getLicenseDocLink(m.title)} target="_blank" rel="noopener noreferrer" className="text-slate-300 hover:text-blue-500 transition-colors">
+                                                            <ExternalLink className="w-5 h-5" />
+                                                        </a>
+                                                    )}
+                                                </div>
                                                 <div className="space-y-3 mt-auto">
                                                     {m.data.tiers.map(t => (
-                                                        <button key={t} onClick={() => toggleSelection(m.id, t)} className={`w-full flex items-center justify-between px-5 py-3.5 rounded-2xl border-2 transition-all font-black text-[10px] uppercase tracking-widest ${comparisonTiers.some(p => p.mapId === m.id && p.tier === t) ? 'bg-blue-600 border-blue-600 text-white shadow-xl translate-y-[-2px]' : 'bg-slate-50/50 border-slate-100 text-slate-500 hover:border-slate-300 hover:bg-white'}`}>
-                                                            {t}
-                                                            {comparisonTiers.some(p => p.mapId === m.id && p.tier === t) ? <CheckCircle2 className="w-4 h-4" /> : <Plus className="w-4 h-4 opacity-20" />}
-                                                        </button>
+                                                        <div key={t} className="flex gap-2">
+                                                            <button onClick={() => toggleSelection(m.id, t)} className={`flex-1 flex items-center justify-between px-5 py-3.5 rounded-2xl border-2 transition-all font-black text-[10px] uppercase tracking-widest ${comparisonTiers.some(p => p.mapId === m.id && p.tier === t) ? 'bg-blue-600 border-blue-600 text-white shadow-xl translate-y-[-2px]' : 'bg-slate-50/50 border-slate-100 text-slate-500 hover:border-slate-300 hover:bg-white'}`}>
+                                                                {t}
+                                                                {comparisonTiers.some(p => p.mapId === m.id && p.tier === t) ? <CheckCircle2 className="w-4 h-4" /> : <Plus className="w-4 h-4 opacity-20" />}
+                                                            </button>
+                                                            {getLicenseDocLink(t) && (
+                                                                <a href={getLicenseDocLink(t)} target="_blank" rel="noopener noreferrer" className="p-3.5 bg-slate-100 text-slate-400 hover:text-blue-600 rounded-2xl border border-slate-200 transition-all flex items-center justify-center">
+                                                                    <ExternalLink className="w-4 h-4" />
+                                                                </a>
+                                                            )}
+                                                        </div>
                                                     ))}
                                                 </div>
                                             </div>
@@ -490,13 +517,27 @@ const App = () => {
                                     <div className="grid-responsive-cards">
                                         {maps.filter(m => m.type === 'Business').map(m => (
                                             <div key={m.id} className="card-premium p-6 lg:p-8 flex flex-col hover:border-emerald-400">
-                                                <h4 className="font-bold text-slate-800 mb-6 truncate text-lg pr-8">{m.title}</h4>
+                                                <div className="flex justify-between items-start mb-6">
+                                                    <h4 className="font-bold text-slate-800 truncate text-lg pr-2">{m.title}</h4>
+                                                    {getLicenseDocLink(m.title) && (
+                                                        <a href={getLicenseDocLink(m.title)} target="_blank" rel="noopener noreferrer" className="text-slate-300 hover:text-emerald-500 transition-colors">
+                                                            <ExternalLink className="w-5 h-5" />
+                                                        </a>
+                                                    )}
+                                                </div>
                                                 <div className="space-y-3 mt-auto">
                                                     {m.data.tiers.map(t => (
-                                                        <button key={t} onClick={() => toggleSelection(m.id, t)} className={`w-full flex items-center justify-between px-5 py-3.5 rounded-2xl border-2 transition-all font-black text-[10px] uppercase tracking-widest ${comparisonTiers.some(p => p.mapId === m.id && p.tier === t) ? 'bg-emerald-600 border-emerald-600 text-white shadow-xl translate-y-[-2px]' : 'bg-slate-50/50 border-slate-100 text-slate-500 hover:border-slate-300 hover:bg-white'}`}>
-                                                            {t}
-                                                            {comparisonTiers.some(p => p.mapId === m.id && p.tier === t) ? <CheckCircle2 className="w-4 h-4" /> : <Plus className="w-4 h-4 opacity-20" />}
-                                                        </button>
+                                                        <div key={t} className="flex gap-2">
+                                                            <button key={t} onClick={() => toggleSelection(m.id, t)} className={`flex-1 flex items-center justify-between px-5 py-3.5 rounded-2xl border-2 transition-all font-black text-[10px] uppercase tracking-widest ${comparisonTiers.some(p => p.mapId === m.id && p.tier === t) ? 'bg-emerald-600 border-emerald-600 text-white shadow-xl translate-y-[-2px]' : 'bg-slate-50/50 border-slate-100 text-slate-500 hover:border-slate-300 hover:bg-white'}`}>
+                                                                {t}
+                                                                {comparisonTiers.some(p => p.mapId === m.id && p.tier === t) ? <CheckCircle2 className="w-4 h-4" /> : <Plus className="w-4 h-4 opacity-20" />}
+                                                            </button>
+                                                            {getLicenseDocLink(t) && (
+                                                                <a href={getLicenseDocLink(t)} target="_blank" rel="noopener noreferrer" className="p-3.5 bg-slate-100 text-slate-400 hover:text-emerald-600 rounded-2xl border border-slate-200 transition-all flex items-center justify-center">
+                                                                    <ExternalLink className="w-4 h-4" />
+                                                                </a>
+                                                            )}
+                                                        </div>
                                                     ))}
                                                 </div>
                                             </div>
@@ -555,7 +596,14 @@ const App = () => {
                                 <div key={tier} className="flex flex-col w-[340px] shrink-0 group/tier">
                                     <div className="bg-slate-900 text-white p-7 rounded-t-[2.5rem] shadow-2xl relative overflow-hidden">
                                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-emerald-500 opacity-50" />
-                                        <h3 className="text-xl font-black truncate tracking-tight">{tier}</h3>
+                                        <div className="flex items-center justify-between gap-4">
+                                            <h3 className="text-xl font-black truncate tracking-tight">{tier}</h3>
+                                            {getLicenseDocLink(tier) && (
+                                                <a href={getLicenseDocLink(tier)} target="_blank" rel="noopener noreferrer" className="text-white/40 hover:text-white transition-colors" title="Official Documentation">
+                                                    <ExternalLink className="w-5 h-5" />
+                                                </a>
+                                            )}
+                                        </div>
                                         <div className="flex items-center gap-2 mt-1">
                                             <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
                                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Infrastructure</span>
@@ -642,7 +690,18 @@ const App = () => {
                                     <thead className="sticky top-0 z-30 bg-white/90 backdrop-blur-xl">
                                         <tr>
                                             <th className="p-8 text-left border-b-2 font-black text-xl lg:text-2xl min-w-[300px]">Capability Area</th>
-                                            {activeMap.tiers.map(t => <th key={t} className="p-8 text-center border-b-2 font-black text-[9px] uppercase tracking-[0.2em] text-slate-400 max-w-[150px]">{t}</th>)}
+                                            {activeMap.tiers.map(t => (
+                                                <th key={t} className="p-8 text-center border-b-2 font-black text-[9px] uppercase tracking-[0.2em] text-slate-400 max-w-[150px]">
+                                                    <div className="flex flex-col items-center gap-2">
+                                                        <span>{t}</span>
+                                                        {getLicenseDocLink(t) && (
+                                                            <a href={getLicenseDocLink(t)} target="_blank" rel="noopener noreferrer" className="text-slate-300 hover:text-blue-500 transition-colors">
+                                                                <ExternalLink className="w-3 h-3" />
+                                                            </a>
+                                                        )}
+                                                    </div>
+                                                </th>
+                                            ))}
                                         </tr>
                                     </thead>
                                     <tbody>

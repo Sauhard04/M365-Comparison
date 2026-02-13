@@ -83,9 +83,22 @@ app.post('/api/extract', upload.single('file'), async (req, res) => {
 
         const base64Data = file.buffer.toString('base64');
 
-        const prompt = `Analyze this Microsoft Licensing PDF for ${track} tracks.
+        const prompt = `EXPERT ANALYSIS MODE: Analyze this Microsoft Licensing PDF for ${track} tracks with maximum granularity.
         
-        Return RAW JSON ONLY with this structure:
+        GOAL: Identify EVERY distinct feature, capability, and entitlement. Pay special attention to:
+        1. Advanced Security (Defender, Sentinel, Purview integrations)
+        2. Compliance & Governance (eDiscovery, Data Loss Prevention, Audit logs)
+        3. Management & Automation (Intune, AutoPilot, PowerShell modules)
+        4. Identity (Entra ID P1/P2 features)
+        5. Productivity differences (storage limits, desktop vs web apps)
+
+        RULES:
+        - Extract 50+ distinct features if possible.
+        - Be highly specific (e.g., "Defender for Endpoint P2" instead of just "Defender").
+        - For 'status', use exactly one of these: "Full", "Partial", "Add-on", "Not Included".
+        - Ensure a documentation link from learn.microsoft.com is provided for every single feature.
+
+        Return RAW JSON ONLY:
         {
           "tiers": ["Tier Name A", "Tier Name B"],
           "categories": [
@@ -94,9 +107,9 @@ app.post('/api/extract', upload.single('file'), async (req, res) => {
               "features": [
                 {
                   "name": "Feature Name",
-                  "description": "Short description",
+                  "description": "Deep technical description",
                   "link": "https://learn.microsoft.com/...",
-                  "status": { "Tier Name A": "Included", "Tier Name B": "Excluded" }
+                  "status": { "Tier Name A": "Full", "Tier Name B": "Partial" }
                 }
               ]
             }

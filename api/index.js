@@ -64,6 +64,44 @@ app.delete('/api/maps/:id', async (req, res) => {
     }
 });
 
+// Sync history endpoint
+app.get('/api/sync-history', async (req, res) => {
+    try {
+        const database = await getDB();
+        const history = await database.collection('sync_history')
+            .find({})
+            .sort({ timestamp: -1 })
+            .limit(10)
+            .toArray();
+        res.json(history);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Available sync sources
+app.get('/api/sync-sources', (req, res) => {
+    res.json({
+        sources: {
+            enterprise_m365: {
+                title: "Microsoft 365 Enterprise (E3 / E5 / F3)",
+                type: "Enterprise",
+                url: "https://www.microsoft.com/en-us/microsoft-365/enterprise/microsoft365-plans-and-pricing",
+            },
+            enterprise_office365: {
+                title: "Office 365 Enterprise (E1 / E3 / E5)",
+                type: "Enterprise",
+                url: "https://www.microsoft.com/en-us/microsoft-365/enterprise/compare-office-365-plans",
+            },
+            business: {
+                title: "Microsoft 365 Business (Basic / Standard / Premium)",
+                type: "Business",
+                url: "https://www.microsoft.com/en-us/microsoft-365/business/compare-all-plans",
+            },
+        }
+    });
+});
+
 app.post('/api/extract', upload.single('file'), async (req, res) => {
     const { track } = req.body;
     const file = req.file;

@@ -53,7 +53,11 @@ import {
     Link2,
     ArrowLeft as BackIcon,
     Globe,
-    Database
+    Database,
+    RefreshCw,
+    CloudDownload,
+    Clock,
+    Zap
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toPng } from 'html-to-image';
@@ -159,6 +163,9 @@ const App = () => {
     const [maps, setMaps] = useState([]);
     const [comparisonTiers, setComparisonTiers] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [syncing, setSyncing] = useState(false);
+    const [syncStatus, setSyncStatus] = useState('');
+    const [lastSyncTime, setLastSyncTime] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [diffOnly, setDiffOnly] = useState(false);
     const [matrixMode, setMatrixMode] = useState('full'); // 'full' or 'availability'
@@ -274,6 +281,66 @@ const App = () => {
             setLoading(false);
         }
     };
+
+    // Auto-Sync from Official Microsoft Sources
+    const handleMicrosoftSync = async (sources = null) => {
+        if (!isAdmin) return;
+        setSyncing(true);
+        setSyncStatus('Connecting to Microsoft...');
+        try {
+            const body = sources ? { sources } : {};
+            setSyncStatus('Fetching official comparison pages...');
+
+            const response = await fetch('/api/sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+
+            if (!response.ok) {
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    const errData = await response.json();
+                    throw new Error(errData.error || 'Sync failed');
+                } else {
+                    throw new Error(`Sync failed with status ${response.status}`);
+                }
+            }
+
+            const result = await response.json();
+            setSyncStatus(`Synced ${result.totalSynced} sources (${result.totalFailed} failed)`);
+            setLastSyncTime(result.syncedAt);
+
+            // Refresh maps from DB
+            const mapsRes = await fetch('/api/maps');
+            if (mapsRes.ok) {
+                const data = await mapsRes.json();
+                setMaps(data.map(m => ({ ...m, id: m._id })));
+            }
+
+            setShowUploadModal(false);
+            if (result.totalSynced > 0) setView('library');
+        } catch (err) {
+            console.error('SYNC ERROR:', err);
+            setSyncStatus(`Sync failed: ${err.message}`);
+            alert(`Microsoft Sync Failed: ${err.message}`);
+        } finally {
+            setTimeout(() => {
+                setSyncing(false);
+                setSyncStatus('');
+            }, 3000);
+        }
+    };
+
+    // Fetch last sync time on mount
+    useEffect(() => {
+        fetch('/api/sync-history')
+            .then(r => r.ok ? r.json() : [])
+            .then(history => {
+                if (history.length > 0) setLastSyncTime(history[0].timestamp);
+            })
+            .catch(() => { });
+    }, []);
 
     const deleteMap = async (mapId) => {
         if (!window.confirm("Are you sure you want to delete this knowledge source from the cloud?")) return;
@@ -858,20 +925,80 @@ const App = () => {
 
                 {isAdmin && showUploadModal && (
                     <div className="absolute inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-6">
-                        <div className="bg-white rounded-[2.5rem] shadow-2xl p-10 w-full max-w-md animate-in zoom-in duration-300">
-                            <h2 className="text-2xl font-bold mb-6 text-center">New Knowledge Source</h2>
+                        <div className="bg-white rounded-[2.5rem] shadow-2xl p-10 w-full max-w-lg animate-in zoom-in duration-300">
+                            <h2 className="text-2xl font-bold mb-2 text-center">Add Knowledge Source</h2>
+                            <p className="text-xs text-slate-400 text-center mb-8">Sync from official Microsoft pages or upload a PDF manually</p>
                             <div className="space-y-6">
+                                {/* Auto-Sync Section */}
+                                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-3xl p-6 border border-blue-100">
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <div className="bg-blue-600 p-2 rounded-xl"><CloudDownload className="w-5 h-5 text-white" /></div>
+                                        <div>
+                                            <h3 className="font-bold text-sm text-slate-800">Sync from Microsoft</h3>
+                                            <p className="text-[10px] text-slate-500">Auto-fetch from official comparison pages</p>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2 mb-4">
+                                        <div className="flex items-center justify-between bg-white/70 rounded-2xl px-4 py-3 border border-blue-100">
+                                            <div>
+                                                <span className="text-xs font-bold text-slate-700">M365 Enterprise</span>
+                                                <span className="text-[9px] text-slate-400 ml-2">E3 / E5 / F3</span>
+                                            </div>
+                                            <button onClick={() => handleMicrosoftSync(['enterprise_m365'])} disabled={syncing} className="text-[9px] font-black text-blue-600 hover:text-blue-800 uppercase tracking-widest disabled:opacity-50">{syncing ? '...' : 'Sync'}</button>
+                                        </div>
+                                        <div className="flex items-center justify-between bg-white/70 rounded-2xl px-4 py-3 border border-blue-100">
+                                            <div>
+                                                <span className="text-xs font-bold text-slate-700">Office 365 Enterprise</span>
+                                                <span className="text-[9px] text-slate-400 ml-2">E1 / E3 / E5</span>
+                                            </div>
+                                            <button onClick={() => handleMicrosoftSync(['enterprise_office365'])} disabled={syncing} className="text-[9px] font-black text-blue-600 hover:text-blue-800 uppercase tracking-widest disabled:opacity-50">{syncing ? '...' : 'Sync'}</button>
+                                        </div>
+                                        <div className="flex items-center justify-between bg-white/70 rounded-2xl px-4 py-3 border border-blue-100">
+                                            <div>
+                                                <span className="text-xs font-bold text-slate-700">M365 Business</span>
+                                                <span className="text-[9px] text-slate-400 ml-2">Basic / Standard / Premium</span>
+                                            </div>
+                                            <button onClick={() => handleMicrosoftSync(['business'])} disabled={syncing} className="text-[9px] font-black text-emerald-600 hover:text-emerald-800 uppercase tracking-widest disabled:opacity-50">{syncing ? '...' : 'Sync'}</button>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => handleMicrosoftSync()}
+                                        disabled={syncing}
+                                        className="w-full flex items-center justify-center gap-3 bg-blue-600 text-white py-4 rounded-2xl font-black text-sm hover:bg-blue-700 transition-all shadow-xl shadow-blue-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                                    >
+                                        {syncing ? (
+                                            <><RefreshCw className="w-5 h-5 animate-spin" /> {syncStatus || 'Syncing...'}</>
+                                        ) : (
+                                            <><Zap className="w-5 h-5" /> Sync All Sources</>
+                                        )}
+                                    </button>
+                                    {lastSyncTime && (
+                                        <p className="text-[9px] text-slate-400 text-center mt-3 flex items-center justify-center gap-1">
+                                            <Clock className="w-3 h-3" /> Last synced: {new Date(lastSyncTime).toLocaleString()}
+                                        </p>
+                                    )}
+                                </div>
+
+                                {/* Divider */}
+                                <div className="flex items-center gap-4">
+                                    <div className="flex-1 h-px bg-slate-200"></div>
+                                    <span className="text-[10px] font-black uppercase text-slate-300 tracking-widest">or</span>
+                                    <div className="flex-1 h-px bg-slate-200"></div>
+                                </div>
+
+                                {/* Manual Upload Section */}
                                 <div>
-                                    <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block text-center">Licensing Track</label>
-                                    <div className="p-1 bg-slate-100 rounded-2xl flex">
+                                    <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block text-center">Manual PDF Upload</label>
+                                    <div className="p-1 bg-slate-100 rounded-2xl flex mb-4">
                                         <button onClick={() => setUploadTrack('Enterprise')} className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${uploadTrack === 'Enterprise' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-200'}`}>Enterprise</button>
                                         <button onClick={() => setUploadTrack('Business')} className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${uploadTrack === 'Business' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-200'}`}>Business</button>
                                     </div>
+                                    <label className="flex items-center justify-center gap-3 bg-slate-900 text-white py-4 rounded-2xl font-bold text-sm cursor-pointer hover:bg-slate-800 transition-all shadow-lg">
+                                        <Upload className="w-5 h-5" /> Select PDF File
+                                        <input type="file" className="hidden" accept="application/pdf" onChange={handleFileUpload} />
+                                    </label>
                                 </div>
-                                <label className="flex items-center justify-center gap-3 bg-slate-900 text-white py-5 rounded-2xl font-black cursor-pointer hover:bg-slate-800 transition-all shadow-xl">
-                                    <Plus className="w-6 h-6" /> Select PDF Audit Source
-                                    <input type="file" className="hidden" accept="application/pdf" onChange={handleFileUpload} />
-                                </label>
+
                                 <button onClick={() => setShowUploadModal(false)} className="w-full text-slate-400 font-bold py-2 hover:text-slate-600 transition-colors">Cancel</button>
                             </div>
                         </div>
@@ -888,9 +1015,17 @@ const App = () => {
                     <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
                         <Library className="w-3.5 h-3.5" /> {maps.length} Knowledge Sources
                     </div>
+                    {lastSyncTime && (
+                        <>
+                            <div className="w-[1px] h-4 bg-slate-200"></div>
+                            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-500">
+                                <RefreshCw className="w-3.5 h-3.5" /> Last Sync: {new Date(lastSyncTime).toLocaleDateString()}
+                            </div>
+                        </>
+                    )}
                 </div>
                 <div className="text-[10px] font-black text-slate-300 uppercase tracking-widest">
-                    LicenseMap Explorer V5.0.0
+                    LicenseMap Explorer V6.0.0
                 </div>
             </footer>
         </div>
